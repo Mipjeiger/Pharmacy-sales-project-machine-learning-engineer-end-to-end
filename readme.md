@@ -1,4 +1,4 @@
-## Workflow Pharmacy Machine Learning Engineer end-to-end Project 💊
+## Workflow Pharmacy Machine Learning Engineer end-to-end Mini Project 💊
 ![alt text](images/84B05E67-588D-474E-9AFD-3B599294806A.png)
 
 This project are integrating Between Machine learning Engineer and Data engineer.
