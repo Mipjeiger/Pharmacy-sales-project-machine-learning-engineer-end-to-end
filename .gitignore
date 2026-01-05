@@ -2,3 +2,12 @@
 __pycache__/
 .DS_Store
 **/.DS_Store
+run_pipeline.sh
+airflow/logs
+airflow/airflow.db-shm
+airflow/airflow.db-wal
+airflow/simple_auth_manager_passwords.json.generated
+airflow/airflow.cfg
+airflow/airflow.db
+airflow.log
+aiflow

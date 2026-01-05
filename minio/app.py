@@ -14,7 +14,6 @@ minio = Minio(
     mini_port=int(os.getenv("minio_port")),
     access_key=os.getenv("access_key"),
     secret_key=os.getenv("secret_key"),
-    bucket_name=os.getenv("bucket_name"),
     secure=False,
 )
 
