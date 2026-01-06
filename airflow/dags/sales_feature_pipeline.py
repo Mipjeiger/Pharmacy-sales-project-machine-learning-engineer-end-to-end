@@ -19,11 +19,14 @@ def get_env_path():
 
 
 def get_minio_client():
-    """Create MinIO client"""
+    """Create MinIO client - called inside each task"""
     from minio import Minio
     from dotenv import load_dotenv
 
-    _, env_path = get_env_path()
+    project_root = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )
+    env_path = os.path.join(project_root, ".env")
     load_dotenv(dotenv_path=env_path)
 
     return Minio(
@@ -42,8 +45,36 @@ def get_db_engine():
     _, env_path = get_env_path()
     load_dotenv(dotenv_path=env_path)
 
-    db_url = f"postgresql+psycopg2://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
+    db_user = os.getenv("DB_USER")
+    db_password = os.getenv("DB_PASSWORD")
+    db_host = os.getenv("DB_HOST")
+    db_port = os.getenv("DB_PORT")
+    db_name = os.getenv("DB_NAME")
+
+    if not all([db_user, db_password, db_host, db_port, db_name]):
+        raise ValueError("Database environment variables are not fully set.")
+
+    db_url = (
+        f"postgresql+psycopg2://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+    )
     return create_engine(db_url, pool_pre_ping=True, pool_recycle=3600)
+
+
+# Ensure minio bucket exist
+def ensure_buckets_exists():
+    """Ensure all required buckets exists"""
+    minio = get_minio_client()
+    required_buckets = ["bronze", "silver", "gold", "analytics"]
+
+    for bucket in required_buckets:
+        try:
+            if not minio.bucket_exists(bucket):
+                minio.make_bucket(bucket)
+                print(f"Created bucket: {bucket}")
+            else:
+                print(f"Bucket exists: {bucket}")
+        except Exception as e:
+            print(f"Error checking/creating bucket {bucket}: {e}")
 
 
 def kafka_to_bronze():
@@ -51,12 +82,19 @@ def kafka_to_bronze():
     import sys
     import importlib.util
 
+    # Ensure buckets exist
+    ensure_buckets_exists()
+
     project_root, _ = get_env_path()
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
 
     # Load consumer module dynamically to avoid kafka package conflict
     consumer_path = os.path.join(project_root, "kafka", "consumer.py")
+
+    if not os.path.exists(consumer_path):
+        raise FileNotFoundError(f"Kafka consumer module not found at {consumer_path}")
+
     spec = importlib.util.spec_from_file_location("kafka_consumer", consumer_path)
     consumer = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(consumer)
@@ -65,50 +103,66 @@ def kafka_to_bronze():
     count = 0
 
     print("Reading from Kafka...")
-    for batch in consumer.read_batch(limit=1000, max_batches=5):
-        if not batch:
-            continue
+    try:
+        for batch in consumer.read_batch(limit=1000, max_batches=5):
+            if not batch:
+                continue
 
-        df = pd.DataFrame(batch)
-        buffer = io.BytesIO()
-        df.to_parquet(buffer, index=False)
-        buffer.seek(0)
+            df = pd.DataFrame(batch)
+            buffer = io.BytesIO()
+            df.to_parquet(buffer, index=False)
+            buffer.seek(0)
 
-        filename = (
-            f"pharmacy_sales_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{count}.parquet"
-        )
-        minio.put_object("bronze", filename, buffer, len(buffer.getbuffer()))
-        print(f"✓ {filename}: {len(df)} records")
-        count += 1
+            filename = f"pharmacy_sales_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{count}.parquet"
+            minio.put_object("bronze", filename, buffer, len(buffer.getbuffer()))
+            print(f"✓ {filename}: {len(df)} records")
+            count += 1
 
-    print(f"✓ Created {count} files in bronze")
+        print(f"✓ Created {count} files in bronze")
+
+    except Exception as e:
+        print(f"Error in kafka_to_bronze: {e}")
+        raise
 
 
 def bronze_to_silver():
     """Clean bronze data and save to silver bucket"""
     minio = get_minio_client()
-    objects = list(minio.list_objects("bronze", prefix="pharmacy_sales_"))
+    try:
+        objects = list(minio.list_objects("bronze", prefix="pharmacy_sales_"))
 
-    print(f"Processing {len(objects)} files...")
-    for obj in objects:
-        response = minio.get_object("bronze", obj.object_name)
-        df = pd.read_parquet(io.BytesIO(response.read()))
+        if not objects:
+            print("No files found in bronze bucket.")
+            return
 
-        # Clean negative sales
-        if "sales" in df.columns:
-            df = df[df["sales"] >= 0]
+        print(f"Processing {len(objects)} files...")
+        for obj in objects:
+            try:
+                response = minio.get_object("bronze", obj.object_name)
+                df = pd.read_parquet(io.BytesIO(response.read()))
+                response.close()  # Close connection after reading
+                response.release_conn()
 
-        buffer = io.BytesIO()
-        df.to_parquet(buffer, index=False)
-        buffer.seek(0)
+                # Clean negative sales
+                if "sales" in df.columns:
+                    df = df[df["sales"] >= 0]
 
-        minio.put_object("silver", obj.object_name, buffer, len(buffer.getbuffer()))
-        print(f"✓ {obj.object_name}: {len(df)} records")
+                buffer = io.BytesIO()
+                df.to_parquet(buffer, index=False)
+                buffer.seek(0)
 
-        response.close()
-        response.release_conn()
+                minio.put_object(
+                    "silver", obj.object_name, buffer, len(buffer.getbuffer())
+                )
+                print(f"✓ {obj.object_name}: {len(df)} records")
 
-    print(f"✓ Cleaned {len(objects)} files")
+            except Exception as e:
+                print(f"Error processing {obj.object_name}: {e}")
+                raise
+        print(f"✓ Processed {len(objects)} files to silver bucket.")
+    except Exception as e:
+        print(f"Error in bronze_to_silver: {e}")
+        raise
 
 
 def silver_to_gold():
@@ -129,10 +183,14 @@ def silver_to_gold():
         # Load and combine data
         dfs = []
         for obj in objects:
-            response = minio.get_object("silver", obj.object_name)
-            dfs.append(pd.read_parquet(io.BytesIO(response.read())))
-            response.close()
-            response.release_conn()
+            try:
+                response = minio.get_object("silver", obj.object_name)
+                dfs.append(pd.read_parquet(io.BytesIO(response.read())))
+                response.close()
+                response.release_conn()
+            except Exception as e:
+                print(f"Error reading {obj.object_name}: {e}")
+                raise
 
         df = pd.concat(dfs, ignore_index=True)
         print(f"Total: {len(df)} records")
@@ -164,7 +222,7 @@ def silver_to_gold():
             )
             .reset_index()
         )
-        del df
+        del df  # delete dataframe to free memory
 
         # Add rolling metrics
         print("Adding rolling metrics...")
@@ -258,7 +316,7 @@ with DAG(
     schedule=None,
     catchup=False,
     tags=["pharmacy", "etl"],
-    default_args={"owner": "airflow", "retries": 1},
+    default_args={"owner": "airflow", "retries": 2, "retry_delay": 60},
 ) as dag:
 
     t1 = PythonOperator(task_id="kafka_to_bronze", python_callable=kafka_to_bronze)

@@ -13,3 +13,7 @@ airflow.log
 aiflow
 start_airflow.sh
 nohup.out
+minio.log
+mc
+minio-data/.minio.sys
+.env.backup
