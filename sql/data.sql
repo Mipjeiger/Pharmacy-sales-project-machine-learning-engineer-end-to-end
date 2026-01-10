@@ -7,3 +7,8 @@ SELECT * FROM features.pharmacy_sales_enhanced; -- Ingest data from Pharmacy sal
 ALTER TABLE features.sales_feature
 ADD COLUMN rolling_avg_3m_sales NUMERIC;
 ADD COLUMN sales_growth_pct NUMERIC;
+
+-- check distinct years in the raw data
+SELECT DISTINCT year
+FROM raw.pharmacy_sales
+ORDER BY year DESC;
