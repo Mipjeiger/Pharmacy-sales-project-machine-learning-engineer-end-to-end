@@ -1,6 +1,5 @@
 """
-Sales Feature Pipeline - Simplified version without multiprocessing conflicts
-This DAG reads from Kafka, processes data through Bronze -> Silver -> Gold layers
+Sales Feature Pipeline read by kafka and processes data through Bronze -> Silver -> Gold layers
 """
 
 import io

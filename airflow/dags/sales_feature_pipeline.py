@@ -12,12 +12,14 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 
 
+# Function to get project root and .env path
 def get_env_path():
     """Get project root and .env path"""
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     return root, os.path.join(root, ".env")
 
 
+# Function to create MinIO client
 def get_minio_client():
     """Create MinIO client - called inside each task"""
     from minio import Minio
@@ -30,13 +32,14 @@ def get_minio_client():
     load_dotenv(dotenv_path=env_path)
 
     return Minio(
-        f"{os.getenv('minio_host')}:{os.getenv('minio_port')}",
-        access_key=os.getenv("access_key"),
-        secret_key=os.getenv("secret_key"),
+        f"{os.getenv('MINIO_HOST')}:{os.getenv('MINIO_PORT')}",
+        access_key=os.getenv("MINIO_ACCESS_KEY"),
+        secret_key=os.getenv("MINIO_SECRET_KEY"),
         secure=False,
     )
 
 
+# Function to call PostgreSQL engine
 def get_db_engine():
     """Create PostgreSQL engine"""
     from sqlalchemy import create_engine
@@ -143,9 +146,11 @@ def bronze_to_silver():
                 response.close()  # Close connection after reading
                 response.release_conn()
 
-                # Clean negative sales
+                # Clean negative sales to prevent skewed analysis
                 if "sales" in df.columns:
                     df = df[df["sales"] >= 0]
+                else:
+                    print(f"Warning: 'sales' column not found in {obj.object_name}")
 
                 buffer = io.BytesIO()
                 df.to_parquet(buffer, index=False)
@@ -194,13 +199,10 @@ def silver_to_gold():
 
         df = pd.concat(dfs, ignore_index=True)
         print(f"Total: {len(df)} records")
-        del dfs
+        del dfs  # free memory
 
-        # Sort data
-        df = df.sort_values(["distributor", "product_name", "city", "year", "month"])
-
-        # Aggregate features
-        print("Creating features...")
+        # Aggregate feature
+        print("Creating feature...")
         feature = (
             df.groupby(
                 [
@@ -222,20 +224,68 @@ def silver_to_gold():
             )
             .reset_index()
         )
+        # Clean outliers
+        sales_upper_bound = feature["total_sales"].quantile(0.95)
+        feature["total_sales_clean"] = feature["total_sales"].clip(
+            lower=50, upper=sales_upper_bound
+        )
         del df  # delete dataframe to free memory
 
-        # Add rolling metrics
-        print("Adding rolling metrics...")
-        grp = feature.groupby(["distributor", "product_name", "city"])
-        feature["rolling_avg_3m_sales"] = grp["total_sales"].transform(
-            lambda x: x.rolling(3, min_periods=1).mean()
+        """Split data"""
+        # Convert month to digit
+        month_mapping = {
+            "January": 1,
+            "February": 2,
+            "March": 3,
+            "April": 4,
+            "May": 5,
+            "June": 6,
+            "July": 7,
+            "August": 8,
+            "September": 9,
+            "October": 10,
+            "November": 11,
+            "December": 12,
+        }
+
+        # Time feature engineering for sorting and splitting by time
+        feature["year"] = feature["year"].astype(int)
+        feature["month"] = feature["month"].map(month_mapping)
+        feature = feature.sort_values(by=["distributor", "year", "month"])
+
+        # Feature engineering
+        print("Engineering features...")
+        df = df.copy()
+        df = df.sort_values(["distributor", "city", "year", "month"])
+        grp = df.groupby(
+            ["distributor", "product_name", "city"]
+        )  # Factor for rolling calculations on lag features
+
+        # Lag features - use values from previous months as sales past ago
+        df["lag_1m_sales"] = grp["total_sales_clean"].shift(1)
+        df["lag_3m_sales"] = grp["total_sales_clean"].shift(3)
+        df["lag_6m_sales"] = grp["total_sales_clean"].shift(6)
+        print("✓ Created lag features")
+
+        # Rolling features
+        df["rolling_avg_3m"] = grp["total_sales_clean"].transform(
+            lambda x: x.shift(1).rolling(window=3, min_periods=1).mean()
         )
-        feature["sales_growth_pct"] = grp["total_sales"].transform(
-            lambda x: x.pct_change() * 100
+        df["rolling_avg_6m"] = grp["total_sales_clean"].transform(
+            lambda x: x.shift(1).rolling(window=6, min_periods=1).mean()
+        )
+        # Growth percentage
+        df["sales_growth_pct"] = grp["total_sales_clean"].transform(
+            lambda x: x.pct_change().shift(1) * 100
         )
 
-        # Clean NaN and Inf
-        feature = feature.replace([np.inf, -np.inf], np.nan).fillna(0)
+        # Seasonal features (month encoding)
+        df["month_sin"] = np.sin(2 * np.pi * df["month"] / 12)
+        df["month_cos"] = np.cos(2 * np.pi * df["month"] / 12)
+
+        # Clean NaN
+        df = df.replace([np.inf, -np.inf], np.nan)
+        df = df.fillna(0)
 
         # Save to MinIO gold bucket
         print(f"Saving {len(feature)} records to gold bucket...")
@@ -259,6 +309,7 @@ def silver_to_gold():
                 total_sales=("total_sales", "sum"),
                 avg_price=("avg_price", "mean"),
                 product_count=("product_name", "nunique"),
+                sales_growth_pct_avg=("sales_growth_pct", "mean"),
             )
             .reset_index()
         )
