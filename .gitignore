@@ -19,3 +19,7 @@ minio-data/.minio.sys
 .env.backup
 notebooks/catboost_info
 .vscode
+__pycache__/
+.feast/
+mlruns/
+pharmacy_feature_store/feature_repo/data
