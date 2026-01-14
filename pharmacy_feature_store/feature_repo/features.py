@@ -65,7 +65,7 @@ pharmacy_sales_source = PostgreSQLSource(
 # ============================================
 
 sales_feature_view = FeatureView(
-    name="sales_features",
+    name="sales_features",  # Name of the feature view
     entities=[distributor, city, product],
     schema=[
         Field(name="product_class", dtype=String),

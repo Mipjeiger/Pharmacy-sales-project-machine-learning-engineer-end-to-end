@@ -219,13 +219,13 @@ def create_entity_dataframe(sample_data: pd.DataFrame = None) -> pd.DataFrame:
         DataFrame with entity keys and event timestamps.
     """
     print("\nCreating entity DataFrame for feature retrieval...")
-    if sample_data is not None and len(sample_data) >= 1:
+    if sample_data is not None and len(sample_data) >= 2:
         # Use real data from PostgreSQL
         entity_df = pd.DataFrame(
             {
-                "distributor": sample_data["distributor"].iloc[:1].tolist(),
-                "city": sample_data["city"].iloc[:1].tolist(),
-                "product_name": sample_data["product_name"].iloc[:1].tolist(),
+                "distributor": sample_data["distributor"].iloc[:2].tolist(),
+                "city": sample_data["city"].iloc[:2].tolist(),
+                "product_name": sample_data["product_name"].iloc[:2].tolist(),
                 "event_timestamp": [datetime.now(), datetime.now()],
             }
         )
