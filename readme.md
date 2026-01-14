@@ -37,6 +37,25 @@ Business solution for complicated busineess in real world are using Artificial I
     
 - Integrating airflow dags about 2 data list airflow/dags/sales_feature_pipeline.py and airflow/dags/sales_feature_pipeline_v2.py
 - Success integrating airflow for sales_feature_pipeline
+- Re-check and retrain the code first in machine learning is a must before transform to streamlit
+- Quantile concerned to limit outliers in feature engineering
+- Stuck progress in notebook for sales data audit and experiment models, try to fix in pipelines engineering
+- Debugging on retraining from kafka to airflow for ingesting data by producer and transformed in consumer
+- Success to ingest new data on airflow with new producer tho in kafka with sales group
+- Alternative to prevent OOM Error in python for ingesting data from kafka to airflow
+    - Note: Use Chunk to divide data into raw
+- MinIO is a data lake, make a new code for minio with [duckDB.py](http://duckDB.py) and duckDB.sql for different way
+    - in duckDB py is used to connect between sql and minio
+    - in sql to load data
+- Success integrating data from Minio to postgreSQL with ‘silver’ SCHEMA
+- Create a new feast repository with feast init pharmacy_feature_store
+- Integrating manual with feast in terminal before using docker contenarization. Feast apply only can read in ‘features’ (file who include entity/feature view definitions) for list entities and list feature views
+- Data is ready ingested for feast feature store with PostgreSQL which is deployed by infrastructure for sales_features
+    
+    ![6FE70092-B836-4BC9-9ED0-A601535B823C.png](attachment:fa07edc7-fb1b-44b7-94d7-8c12d0224852:6FE70092-B836-4BC9-9ED0-A601535B823C.png)
+    
+- Read databricks, feast, redis documentation
+- Build feature online (for realtime model inference) and offline (for model training / batch scoring) store to provide data ingestion from postgreSQL
 - Kafka to Bronze
     
     ![alt text](images/804216AF-EEEC-4813-BCED-5C3BDE11EC10.png)

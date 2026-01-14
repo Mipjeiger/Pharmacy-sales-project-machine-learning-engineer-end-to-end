@@ -77,3 +77,5 @@ SELECT
     SUM(sales) OVER(PARTITION BY product_name) AS total_sales,
     NOW() AS event_timestamp
 FROM raw.pharmacy_sales;
+
+SELECT * FROM silver.pharmacy_sales LIMIT 10;
