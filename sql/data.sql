@@ -67,3 +67,13 @@ SELECT
 
 CREATE TABLE silver.pharmacy_sales AS
 SELECT * FROM read_parquet()
+
+CREATE TABLE IF NOT EXISTS raw.sample_pharmacy AS
+SELECT
+    product_name,
+    quantity,
+    price,
+    AVG(price) OVER(PARTITION BY product_name) AS avg_price,
+    SUM(sales) OVER(PARTITION BY product_name) AS total_sales,
+    NOW() AS event_timestamp
+FROM raw.pharmacy_sales;

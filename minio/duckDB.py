@@ -1,3 +1,5 @@
+"""Integrating MinIO silver data into PostgreSQL using DuckDB as an intermediary."""
+
 import duckdb
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
