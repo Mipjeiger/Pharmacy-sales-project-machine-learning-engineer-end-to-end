@@ -13,7 +13,7 @@ Business solution for complicated busineess in real world are using Artificial I
 - Handle risk management and risk score
 - Fraud detection in customer about the transaction
 
-## Log project progress 👨‍💻
+## Logs documentation 👨‍💻
 
 - Build structural workflow project in miro using tools
     - PostgreSQL
@@ -88,18 +88,18 @@ Business solution for complicated busineess in real world are using Artificial I
 - Integrating dashboard UI analytics visualization in Streamlit
     - Pharmacy Sales Analytics Dashboard
     
-    ![768AB076-E147-4398-9262-8C6DF2623C4E.png](attachment:474032cf-cd42-452b-9b75-639e4d89a47e:768AB076-E147-4398-9262-8C6DF2623C4E.png)
+    ![alt text](images/768AB076-E147-4398-9262-8C6DF2623C4E.png)
     
     - Sales Overview
     
-    ![3412E540-EA36-478C-B508-BED5E5528626.png](attachment:7d637d51-5cd5-4d45-a497-0d786e5e23c5:3412E540-EA36-478C-B508-BED5E5528626.png)
+    ![alt text](images/3412E540-EA36-478C-B508-BED5E5528626.png)
     
     - Geographic Analysis
     
-    ![4F170606-DC11-40C6-822B-39CA031687A2.png](attachment:28c727be-a1e4-414f-8de8-ea44c017fbb7:4F170606-DC11-40C6-822B-39CA031687A2.png)
+    ![alt text](images/4F170606-DC11-40C6-822B-39CA031687A2.png)
     
     - Detailed data
     
-    ![0C540A72-A53A-49E2-BDC9-DA049B668F62.png](attachment:067d7141-cb97-4730-a51e-e0d123c99203:0C540A72-A53A-49E2-BDC9-DA049B668F62.png)
+    ![alt text](images/0C540A72-A53A-49E2-BDC9-DA049B668F62.png)
     
 - 🚨 Totally warning alert!!! cuz inconsistant data belong to .parquet what was ingested. GO FIX IT CAUSE THIS IS NOT LOGICAL ENABLED
